@@ -1,0 +1,4 @@
+#!/bin/bash
+autoreconf --force --install
+./configure CXXFLAGS='-O0 -g -DDEBUG'
+# vim: syntax=sh
