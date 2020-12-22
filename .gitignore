@@ -8,7 +8,6 @@ translator
 *.guess
 *.log
 *.status
-configure
 libtool
 depcomp
 *.m4
