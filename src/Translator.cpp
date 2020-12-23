@@ -1,5 +1,6 @@
 #include    <Translator.h>
 #include    <Exception.h>
+#include    <Config.h>
 
 #include    <cstdlib>
 #include    <fstream>
@@ -16,9 +17,10 @@ void Translator::Usage(char const* prog, char const* message) {
         std::cerr << message << "\n\n";
     }
 
-    std::cerr << "usage: " << prog
-         << " [-i <input>] [-o <output>] --from <format> --to <format>"
-            " [--help|-?] [--list_from] [--list_to] [--list-all]\n"
+    std::cerr << "usage: " << prog << " [-i <input>] [-o <output>] --from <format> --to <format>\n"
+                           << prog << " [--list_from] [--list_to] [--list-all]\n"
+                           << prog << " [--help|-?]\n"
+                           << prog << " [--version|-v]\n"
             "where: i .......... The pathname of the input file\n"
             "       o .......... The pathname of the outpput file\n"
             "       ?|help ..... Display this help screen and exit\n"
@@ -26,7 +28,8 @@ void Translator::Usage(char const* prog, char const* message) {
             "       to ......... The format type of the output\n"
             "       list-from .. List all input format types\n"
             "       list-to .... List all output format types\n"
-            "       list-all ... List all input/output format types\n";
+            "       list-all ... List all input/output format types\n"
+            "       v|version .. Display the version of the program\n";
 
     throw Exception(-1, "Help reported");
 }
@@ -35,7 +38,7 @@ void Translator::Usage(char const* prog, char const* message) {
 //  ----------------------------------------------------------------------------
 void Translator::Args(int argc, char** argv) {
 
-    char const* const short_options ="?i:o:";
+    char const* const short_options ="?vi:o:";
     struct option long_options[] = {
         { "from",      required_argument, 0, 0 },
         { "to",        required_argument, 0, 0 },
@@ -43,6 +46,7 @@ void Translator::Args(int argc, char** argv) {
         { "list-from", no_argument,       0, 0 },
         { "list-to",   no_argument,       0, 0 },
         { "list-all",  no_argument,       0, 0 },
+        { "version",   no_argument,       0, 0 },
         { 0,           0,                 0, 0 }
     };
 
@@ -62,6 +66,7 @@ void Translator::Args(int argc, char** argv) {
                     case 3: list_readers_ = true;   break;
                     case 4: list_writers_ = true;   break;
                     case 5: list_readers_ = list_writers_ = true;   break;
+                    case 6: version_ = true;        break;
                     default:
                         Usage(argv[0], "Unrecognized option");
                         break;
@@ -75,7 +80,12 @@ void Translator::Args(int argc, char** argv) {
 //  ----------------------------------------------------------------------------
 //  Translator::Setup
 //  ----------------------------------------------------------------------------
-void Translator::Setup() {
+void Translator::Setup(const char* prog) {
+    //  version
+    if(version_) {
+        std::cerr << prog << " Version " << Translator_VERSION_MAJOR << '.' << Translator_VERSION_MINOR << '\n';
+    }
+
     //  list readers
     if(list_readers_) {
         auto const& readers = Factory::ReaderList();
@@ -110,6 +120,9 @@ void Translator::Setup() {
     }
 
     //  set input stream
+    if(from_type_.empty()) {
+        Usage(prog, "ERROR: From format not specified");
+    }
     if(!from_file_.empty()) {
        is_conf_ = std::make_unique<std::ifstream>(from_file_.c_str());
        is_ = is_conf_.get();
@@ -119,10 +132,13 @@ void Translator::Setup() {
     }
     reader_ = Factory::LookupReader(from_type_, *is_);
     if(!reader_) {
-        throw Exception(-1, "Cannot find reade format");
+        throw Exception(-1, "Cannot find from format");
     }
 
     //  set output stream
+    if(to_type_.empty()) {
+        Usage(prog, "ERROR: To format not specified");
+    }
     if(!to_file_.empty()) {
        os_conf_ = std::make_unique<std::ofstream>(to_file_.c_str());
        os_ = os_conf_.get();
@@ -132,7 +148,7 @@ void Translator::Setup() {
     }
     writer_ = Factory::LookupWriter(to_type_, *os_);
     if(!writer_) {
-        throw Exception(-1, "Cannot find write format");
+        throw Exception(-1, "Cannot find to format");
     }
 }
 //  ----------------------------------------------------------------------------
@@ -140,7 +156,7 @@ void Translator::Setup() {
 //  ----------------------------------------------------------------------------
 Translator::Translator(int argc, char** argv) {
     Args(argc, argv);
-    Setup();
+    Setup(argv[0]);
 }
 //  ----------------------------------------------------------------------------
 //  Translator::Run

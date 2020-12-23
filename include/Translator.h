@@ -13,7 +13,7 @@ class Translator {
     private:
         void Args(int argc, char** argv);
         void Usage(char const* prog, char const* message = nullptr);
-        void Setup();
+        void Setup(const char* prog);
         std::istream* is_;          //!< the configured input stream
         std::ostream* os_;          //!< the configured output stream
         std::unique_ptr<std::istream> is_conf_;
@@ -27,5 +27,6 @@ class Translator {
         std::string to_file_;
         bool list_readers_ {false};
         bool list_writers_ {false};
+        bool version_ {false};
 };
 }

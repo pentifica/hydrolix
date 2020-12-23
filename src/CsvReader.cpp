@@ -1,12 +1,16 @@
 #include    <CsvReader.h>
 #include    <Factory.h>
+#include    <Exception.h>
 
 #include    <sstream>
 
 namespace {
-//  @TODO   The following code does not provide for the csv escape sequences.  Need to replace
-//          with a regular expression (regex) algo
-std::vector<std::string> Split(std::string&& line) {
+/// A simple csv record processor that assume no special characters are
+/// embedded in each column.
+///
+/// @param[in]  line    The record to process
+/// @return The contents of the individual columns
+std::vector<std::string> SplitSimple(std::string&& line) {
     std::vector<std::string> columns;
     std::string column;
     std::istringstream iss(std::move(line));
@@ -15,8 +19,88 @@ std::vector<std::string> Split(std::string&& line) {
     }
     return columns;
 }
+/// Processing state for the line parser
+enum class ParseState {
+    initial,
+    simple,
+    literal,
+    escape,
+};
+/// A csv record processor that recognizes special characters embedded in a
+///
+/// @param[in]  line    The record to process
+/// @return The contents of the individual columns
+std::vector<std::string> SplitSpecial(std::string&& line) {
+    std::vector<std::string> result;
+    std::string column;
+    ParseState state = ParseState::initial;
+    for(auto ch : line) {
+        switch(state) {
+            case ParseState::initial:
+                switch(ch) {
+                    case '"':
+                        state = ParseState::literal;
+                        break;
+                    case ',':
+                        result.emplace_back("");
+                        break;
+                    default:
+                        column = ch;
+                        state = ParseState::simple;
+                        break;
+                }
+                break;
+            case ParseState::simple:
+                if(ch == ',') {
+                    result.emplace_back(column);
+                    column = "";
+                    state = ParseState::initial;
+                }
+                else {
+                    column += ch;
+                }
+                break;
 
-const bool registered = example::Factory::RegisterReader("csv", example::CsvReader::Factory);
+            case ParseState::literal:
+                if(ch == '"') {
+                    state = ParseState::escape;
+                }
+                else {
+                    column += ch;
+                }
+                break;
+
+            case ParseState::escape:
+                switch(ch) {
+                    case '"':
+                        column += '"';
+                        state = ParseState::literal;
+                        break;
+                    case ',':
+                        state = ParseState::initial;
+                        result.emplace_back(column);
+                        column = "";
+                        break;
+                    default:
+                        throw example::Exception(-1, "CSV syntax error");
+                }
+                break;
+        }
+    }
+
+
+    if(!column.empty()) {
+        result.emplace_back(column);
+    }
+    return result;
+}
+/// A selector for which csv record parser to use
+///
+/// @param[in]  line    The record to process
+/// @return The contents of the individual columns
+inline std::vector<std::string> Split(std::string&& line) { return SplitSpecial(std::move(line)); }
+/// Registers this reader with the factory
+bool const registered = example::Factory::RegisterReader("csv", example::CsvReader::Factory);
 }
 
 namespace example {
